@@ -30,9 +30,17 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::apiResource('profiles', ProfileController::class);
+
+    // Bugs
     Route::apiResource('bugs', BugController::class);
     Route::apiResource('qa-checklists', QaChecklistController::class);
+
+    // QA Checklist Items
     Route::post('qa-checklists/{qaChecklist}/items', [QaChecklistController::class, 'addItem']);
+    Route::put('qa-checklists/{qaChecklist}/items/{item}', [QaChecklistController::class, 'updateItem']);
+    Route::delete('qa-checklists/{qaChecklist}/items/{item}', [QaChecklistController::class, 'deleteItem']);
+    Route::get('qa-checklists/{qaChecklist}/active-items', [QaChecklistController::class, 'getActiveItems']);
+    Route::get('qa-checklists/{qaChecklist}/completed-items', [QaChecklistController::class, 'getCompletedItems']);
     Route::post('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'submitResponse']);
     Route::get('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'getResponses']);
 });

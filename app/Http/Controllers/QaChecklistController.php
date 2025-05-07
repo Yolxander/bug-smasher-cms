@@ -182,4 +182,37 @@ class QaChecklistController extends Controller
 
         return response()->json($responses);
     }
+
+    public function getActiveItems(QaChecklist $qaChecklist)
+    {
+        return response()->json($qaChecklist->getActiveItems());
+    }
+
+    public function getCompletedItems(QaChecklist $qaChecklist)
+    {
+        return response()->json($qaChecklist->getCompletedItems());
+    }
+
+    public function updateItem(Request $request, QaChecklist $qaChecklist, QaChecklistItem $item)
+    {
+        $validator = Validator::make($request->all(), [
+            'item_text' => 'sometimes|required|string',
+            'item_type' => 'sometimes|required|in:checkbox,radio,text',
+            'is_required' => 'sometimes|required|boolean',
+            'order_number' => 'sometimes|required|integer|min:1'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $item->update($request->all());
+        return response()->json($item);
+    }
+
+    public function deleteItem(QaChecklist $qaChecklist, QaChecklistItem $item)
+    {
+        $item->delete();
+        return response()->json(null, 204);
+    }
 }

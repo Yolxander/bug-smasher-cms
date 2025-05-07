@@ -34,7 +34,7 @@ class QaChecklist extends Model
     // Relationships
     public function items()
     {
-        return $this->hasMany(QaChecklistItem::class, 'checklist_id');
+        return $this->hasMany(QaChecklistItem::class, 'checklist_id')->orderBy('order_number');
     }
 
     public function responses()
@@ -50,5 +50,17 @@ class QaChecklist extends Model
     public function updater()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function getActiveItems()
+    {
+        return $this->items()->where('is_required', true)->get();
+    }
+
+    public function getCompletedItems()
+    {
+        return $this->items()->whereHas('responses', function ($query) {
+            $query->where('status', 'completed');
+        })->get();
     }
 }
