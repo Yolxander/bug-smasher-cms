@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Profile;
 use Illuminate\Support\Facades\Log;
 
-class mpresempreProfileController extends Controller
+class ProfileController extends Controller
 {
     /**
      * Display a listing of the resource.
