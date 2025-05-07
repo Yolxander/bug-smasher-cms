@@ -18,7 +18,7 @@ return new class extends Migration
             $table->enum('role', ['admin', 'member', 'viewer'])->default('member');
             $table->enum('status', ['active', 'pending', 'inactive'])->default('pending');
             $table->timestamp('joined_at')->nullable();
-            $table->timestamp('invited_at');
+            $table->timestamp('invited_at')->nullable();
             $table->foreignId('invited_by')->constrained('users');
             $table->string('invitation_token')->nullable()->unique();
             $table->timestamp('invitation_expires_at')->nullable();
