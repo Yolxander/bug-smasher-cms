@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\BugController;
+use App\Http\Controllers\QaChecklistController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,4 +31,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::apiResource('profiles', ProfileController::class);
     Route::apiResource('bugs', BugController::class);
+    Route::apiResource('qa-checklists', QaChecklistController::class);
+    Route::post('qa-checklists/{qaChecklist}/items', [QaChecklistController::class, 'addItem']);
+    Route::post('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'submitResponse']);
+    Route::get('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'getResponses']);
 });
