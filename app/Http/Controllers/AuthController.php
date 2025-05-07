@@ -24,10 +24,16 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+        // Create a profile for the new user
+        $user->profile()->create([
+            'email' => $request->email,
+            'full_name' => $request->name,
+        ]);
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load('profile'),
             'token' => $token,
         ], 201);
     }
@@ -45,7 +51,10 @@ class AuthController extends Controller
             ]);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
+        $user = User::where('email', $request->email)
+            ->with('profile')
+            ->firstOrFail();
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
