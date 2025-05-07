@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\BugController;
 use App\Http\Controllers\QaChecklistController;
+use App\Http\Controllers\TeamController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,4 +44,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('qa-checklists/{qaChecklist}/completed-items', [QaChecklistController::class, 'getCompletedItems']);
     Route::post('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'submitResponse']);
     Route::get('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'getResponses']);
+
+    // Teams
+    Route::apiResource('teams', TeamController::class);
+    Route::post('teams/{team}/invite', [TeamController::class, 'invite']);
+    Route::post('teams/invitations/{token}/accept', [TeamController::class, 'acceptInvitation']);
+    Route::post('teams/invitations/{token}/decline', [TeamController::class, 'declineInvitation']);
+    Route::delete('teams/{team}/members/{member}', [TeamController::class, 'removeMember']);
+    Route::put('teams/{team}/members/{member}/role', [TeamController::class, 'updateMemberRole']);
 });
