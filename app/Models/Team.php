@@ -38,6 +38,11 @@ class Team extends Model
         return $this->hasMany(TeamMember::class);
     }
 
+    public function bugs()
+    {
+        return $this->hasMany(Bug::class);
+    }
+
     public function invitations()
     {
         return $this->hasMany(TeamInvitation::class);

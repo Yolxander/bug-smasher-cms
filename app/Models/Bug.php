@@ -11,27 +11,35 @@ class Bug extends Model
 
     protected $fillable = [
         'title',
-        'description',
-        'steps_to_reproduce',
-        'expected_behavior',
-        'actual_behavior',
-        'device',
-        'browser',
-        'os',
         'status',
         'priority',
-        'assignee_id',
-        'project',
-        'url',
-        'screenshot'
+        'type',
+        'assigned_to',
+        'reported_by',
+        'team_id',
+        'due_date',
+        'reproduction_steps',
+        'expected_behavior',
+        'actual_behavior',
+        'additional_notes'
     ];
 
     protected $casts = [
-        'project' => 'array',
+        'due_date' => 'datetime',
     ];
 
-    public function assignee()
+    public function assignedTo()
     {
-        return $this->belongsTo(Profile::class, 'assignee_id');
+        return $this->belongsTo(Profile::class, 'assigned_to');
+    }
+
+    public function reportedBy()
+    {
+        return $this->belongsTo(Profile::class, 'reported_by');
+    }
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
     }
 }
