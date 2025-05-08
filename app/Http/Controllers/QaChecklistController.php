@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\QaChecklist;
 use App\Models\QaChecklistItem;
 use App\Models\QaChecklistResponse;
+use App\Models\QaChecklistAssignment;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,7 @@ class QaChecklistController extends Controller
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
 
-            $checklists = QaChecklist::with(['creator', 'items'])
+            $checklists = QaChecklist::with(['creator', 'items', 'assignments.user', 'assignedUsers'])
                 ->where('is_deleted', false)
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
@@ -103,13 +104,31 @@ class QaChecklistController extends Controller
             Log::info('Checklist item created', $item);
         }
 
-        return response()->json($checklist->load('items'), 201);
+        // Create assignment if users are provided
+        if ($request->has('assigned_users')) {
+            foreach ($request->assigned_users as $userId) {
+                $checklist->assignments()->create([
+                    'user_id' => $userId,
+                    'assigned_at' => now(),
+                    'assigned_by' => auth()->id(),
+                    'status' => 'accepted'
+                ]);
+            }
+        }
+
+        return response()->json($checklist->load(['items', 'assignments.user', 'assignedUsers']), 201);
     }
 
     public function show(QaChecklist $qaChecklist)
     {
         Log::debug('Showing checklist', ['id' => $qaChecklist->id]);
-        return response()->json($qaChecklist->load(['items', 'responses', 'creator']));
+        return response()->json($qaChecklist->load([
+            'items',
+            'responses',
+            'creator',
+            'assignments.user',
+            'assignedUsers'
+        ]));
     }
 
     public function update(Request $request, QaChecklist $qaChecklist)
@@ -132,8 +151,24 @@ class QaChecklistController extends Controller
             // ...updated fields
         ]);
 
+        // Update assignments if provided
+        if ($request->has('assigned_users')) {
+            // Remove existing assignments
+            $qaChecklist->assignments()->delete();
+
+            // Create new assignments
+            foreach ($request->assigned_users as $userId) {
+                $qaChecklist->assignments()->create([
+                    'user_id' => $userId,
+                    'assigned_at' => now(),
+                    'assigned_by' => auth()->id(),
+                    'status' => 'accepted'
+                ]);
+            }
+        }
+
         Log::info('Checklist updated', ['id' => $qaChecklist->id]);
-        return response()->json($qaChecklist->fresh());
+        return response()->json($qaChecklist->fresh(['items', 'assignments.user', 'assignedUsers']));
     }
 
     public function destroy(QaChecklist $qaChecklist)
@@ -240,5 +275,17 @@ class QaChecklistController extends Controller
         Log::info('Deleting checklist item', ['item_id' => $item->id, 'checklist_id' => $qaChecklist->id]);
         $item->delete();
         return response()->json(null, 204);
+    }
+
+    public function getAssignedUsers(QaChecklist $qaChecklist)
+    {
+        Log::debug('Fetching assigned users for checklist', ['checklist_id' => $qaChecklist->id]);
+        return response()->json($qaChecklist->assignedUsers);
+    }
+
+    public function getAssignments(QaChecklist $qaChecklist)
+    {
+        Log::debug('Fetching assignments for checklist', ['checklist_id' => $qaChecklist->id]);
+        return response()->json($qaChecklist->assignments()->with('user')->get());
     }
 }

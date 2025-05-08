@@ -69,4 +69,16 @@ class QaChecklist extends Model
             $query->where('status', 'completed');
         })->get();
     }
+
+    public function assignments()
+    {
+        return $this->hasMany(QaChecklistAssignment::class);
+    }
+
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'qa_checklist_assignments')
+            ->withPivot(['status', 'assigned_at', 'due_date', 'notes'])
+            ->withTimestamps();
+    }
 }

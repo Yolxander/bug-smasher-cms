@@ -266,7 +266,8 @@ class QaChecklistResource extends Resource
                         'active' => 'success',
                         'archived' => 'danger',
                     }),
-                Tables\Columns\TextColumn::make('category')
+                Tables\Columns\TextColumn::make('category.name')
+                    ->label('Category')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()

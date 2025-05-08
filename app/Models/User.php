@@ -51,4 +51,14 @@ class User extends Authenticatable
     {
         return $this->hasOne(Profile::class);
     }
+
+    public function qaChecklistAssignments()
+    {
+        return $this->hasMany(QaChecklistAssignment::class);
+    }
+
+    public function assignedQaChecklists()
+    {
+        return $this->hasMany(QaChecklistAssignment::class, 'assigned_by');
+    }
 }
