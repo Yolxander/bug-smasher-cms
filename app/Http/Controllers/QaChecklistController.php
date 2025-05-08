@@ -14,14 +14,69 @@ class QaChecklistController extends Controller
 {
     public function index()
     {
-        Log::debug('Fetching QA checklists...');
-        $checklists = QaChecklist::with(['creator', 'items'])
-            ->where('is_deleted', false)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        try {
+            Log::info('QA Checklist API Request', [
+                'endpoint' => 'GET /api/qa-checklists',
+                'user_id' => auth()->id(),
+                'user_email' => auth()->user()->email,
+                'timestamp' => now()->toIso8601String(),
+                'request_data' => request()->all(),
+                'headers' => request()->headers->all()
+            ]);
 
-        Log::debug('Fetched checklists:', ['count' => $checklists->count()]);
-        return response()->json($checklists);
+            if (!auth()->check()) {
+                Log::warning('QA Checklist API Unauthorized Access', [
+                    'endpoint' => 'GET /api/qa-checklists',
+                    'timestamp' => now()->toIso8601String()
+                ]);
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+
+            $checklists = QaChecklist::with(['creator', 'items'])
+                ->where('is_deleted', false)
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+
+            Log::info('QA Checklist API Response', [
+                'endpoint' => 'GET /api/qa-checklists',
+                'status' => 'success',
+                'checklists_count' => $checklists->count(),
+                'total_pages' => $checklists->lastPage(),
+                'current_page' => $checklists->currentPage(),
+                'per_page' => $checklists->perPage(),
+                'timestamp' => now()->toIso8601String()
+            ]);
+
+            return response()->json($checklists);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('QA Checklist API Database Error', [
+                'endpoint' => 'GET /api/qa-checklists',
+                'error' => $e->getMessage(),
+                'sql' => $e->getSql(),
+                'bindings' => $e->getBindings(),
+                'trace' => $e->getTraceAsString(),
+                'timestamp' => now()->toIso8601String()
+            ]);
+
+            return response()->json([
+                'error' => 'Database error occurred',
+                'message' => $e->getMessage()
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('QA Checklist API Error', [
+                'endpoint' => 'GET /api/qa-checklists',
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'timestamp' => now()->toIso8601String()
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to fetch QA checklists',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)
