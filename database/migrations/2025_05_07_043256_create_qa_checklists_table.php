@@ -16,21 +16,20 @@ return new class extends Migration
             $table->string('title', 255);
             $table->text('description')->nullable();
             $table->enum('status', ['draft', 'active', 'archived'])->default('draft');
-            $table->foreignId('created_by')->constrained('profiles');
-            $table->foreignId('updated_by')->constrained('profiles');
+            $table->foreignId('created_by')->constrained('users');
+            $table->foreignId('updated_by')->constrained('users');
             $table->integer('version')->default(1);
-            $table->string('category', 100)->nullable();
+            $table->foreignId('category_id')->nullable()->constrained('qa_checklist_categories')->nullOnDelete();
             $table->dateTime('due_date')->nullable();
             $table->string('priority', 50)->nullable();
-            $table->string('tags', 255)->nullable();
-            $table->string('attachments', 255)->nullable();
+            $table->json('tags')->nullable();
+            $table->json('attachments')->nullable();
             $table->text('comments')->nullable();
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
 
             // Add indexes
             $table->index('status');
-            $table->index('category');
             $table->index('priority');
         });
     }

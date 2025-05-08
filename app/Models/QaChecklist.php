@@ -16,7 +16,7 @@ class QaChecklist extends Model
         'created_by',
         'updated_by',
         'version',
-        'category',
+        'category_id',
         'due_date',
         'priority',
         'tags',
@@ -28,7 +28,8 @@ class QaChecklist extends Model
     protected $casts = [
         'due_date' => 'datetime',
         'is_deleted' => 'boolean',
-        'version' => 'integer'
+        'version' => 'integer',
+        'tags' => 'array'
     ];
 
     // Relationships
@@ -50,6 +51,11 @@ class QaChecklist extends Model
     public function updater()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(QaChecklistCategory::class);
     }
 
     public function getActiveItems()

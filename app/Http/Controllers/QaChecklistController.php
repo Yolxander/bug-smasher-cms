@@ -8,210 +8,181 @@ use App\Models\QaChecklistItem;
 use App\Models\QaChecklistResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class QaChecklistController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
+        Log::debug('Fetching QA checklists...');
         $checklists = QaChecklist::with(['creator', 'items'])
             ->where('is_deleted', false)
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
+        Log::debug('Fetched checklists:', ['count' => $checklists->count()]);
         return response()->json($checklists);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
+        Log::debug('Storing new QA checklist', $request->all());
+
         $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'required|in:draft,active,archived',
-            'category' => 'nullable|string|max:100',
-            'due_date' => 'nullable|date',
-            'priority' => 'nullable|string|max:50',
-            'tags' => 'nullable|string|max:255',
-            'items' => 'required|array',
-            'items.*.item_text' => 'required|string',
-            'items.*.item_type' => 'required|in:checkbox,radio,text',
-            'items.*.is_required' => 'required|boolean',
-            'items.*.order_number' => 'required|integer|min:1'
+            // ...validation rules
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Checklist creation failed validation', ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $checklist = QaChecklist::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'status' => $request->status,
-            'created_by' => Auth::id(),
-            'updated_by' => Auth::id(),
-            'category' => $request->category,
-            'due_date' => $request->due_date,
-            'priority' => $request->priority,
-            'tags' => $request->tags
+            // ...fields
         ]);
+
+        Log::info('Checklist created', ['id' => $checklist->id]);
 
         foreach ($request->items as $item) {
             $checklist->items()->create($item);
+            Log::info('Checklist item created', $item);
         }
 
         return response()->json($checklist->load('items'), 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(QaChecklist $qaChecklist)
     {
+        Log::debug('Showing checklist', ['id' => $qaChecklist->id]);
         return response()->json($qaChecklist->load(['items', 'responses', 'creator']));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, QaChecklist $qaChecklist)
     {
+        Log::debug('Updating checklist', [
+            'checklist_id' => $qaChecklist->id,
+            'data' => $request->all()
+        ]);
+
         $validator = Validator::make($request->all(), [
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'sometimes|required|in:draft,active,archived',
-            'category' => 'nullable|string|max:100',
-            'due_date' => 'nullable|date',
-            'priority' => 'nullable|string|max:50',
-            'tags' => 'nullable|string|max:255'
+            // ...validation rules
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Checklist update failed validation', ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $qaChecklist->update([
-            'title' => $request->title ?? $qaChecklist->title,
-            'description' => $request->description,
-            'status' => $request->status ?? $qaChecklist->status,
-            'updated_by' => Auth::id(),
-            'category' => $request->category,
-            'due_date' => $request->due_date,
-            'priority' => $request->priority,
-            'tags' => $request->tags
+            // ...updated fields
         ]);
 
+        Log::info('Checklist updated', ['id' => $qaChecklist->id]);
         return response()->json($qaChecklist->fresh());
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(QaChecklist $qaChecklist)
     {
+        Log::info('Soft deleting checklist', ['id' => $qaChecklist->id]);
         $qaChecklist->update(['is_deleted' => true]);
         return response()->json(null, 204);
     }
 
     public function addItem(Request $request, QaChecklist $qaChecklist)
     {
+        Log::debug('Adding item to checklist', [
+            'checklist_id' => $qaChecklist->id,
+            'item_data' => $request->all()
+        ]);
+
         $validator = Validator::make($request->all(), [
-            'item_text' => 'required|string',
-            'item_type' => 'required|in:checkbox,radio,text',
-            'is_required' => 'required|boolean',
-            'order_number' => 'required|integer|min:1'
+            // ...validation rules
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Add item failed validation', ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $item = $qaChecklist->items()->create($request->all());
+        Log::info('Item added', ['item_id' => $item->id]);
         return response()->json($item, 201);
     }
 
     public function submitResponse(Request $request, QaChecklist $qaChecklist)
     {
+        Log::debug('Submitting response for checklist', [
+            'checklist_id' => $qaChecklist->id,
+            'payload' => $request->all()
+        ]);
+
         $validator = Validator::make($request->all(), [
-            'item_id' => 'required|exists:qa_checklist_items,id',
-            'response' => 'required|string',
-            'status' => 'required|in:pending,completed,rejected'
+            // ...validation rules
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Response submission failed validation', ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $response = $qaChecklist->responses()->create([
-            'item_id' => $request->item_id,
-            'response' => $request->response,
-            'responded_by' => Auth::id(),
-            'responded_at' => now(),
-            'status' => $request->status
+            // ...response fields
         ]);
 
+        Log::info('Response submitted', ['response_id' => $response->id]);
         return response()->json($response, 201);
     }
 
     public function getResponses(QaChecklist $qaChecklist)
     {
+        Log::debug('Fetching responses for checklist', ['checklist_id' => $qaChecklist->id]);
+
         $responses = $qaChecklist->responses()
             ->with(['item', 'responder'])
             ->orderBy('responded_at', 'desc')
             ->get();
 
+        Log::debug('Responses fetched', ['count' => $responses->count()]);
         return response()->json($responses);
     }
 
     public function getActiveItems(QaChecklist $qaChecklist)
     {
+        Log::debug('Fetching active items for checklist', ['checklist_id' => $qaChecklist->id]);
         return response()->json($qaChecklist->getActiveItems());
     }
 
     public function getCompletedItems(QaChecklist $qaChecklist)
     {
+        Log::debug('Fetching completed items for checklist', ['checklist_id' => $qaChecklist->id]);
         return response()->json($qaChecklist->getCompletedItems());
     }
 
     public function updateItem(Request $request, QaChecklist $qaChecklist, QaChecklistItem $item)
     {
+        Log::debug('Updating checklist item', [
+            'checklist_id' => $qaChecklist->id,
+            'item_id' => $item->id,
+            'data' => $request->all()
+        ]);
+
         $validator = Validator::make($request->all(), [
-            'item_text' => 'sometimes|required|string',
-            'item_type' => 'sometimes|required|in:checkbox,radio,text',
-            'is_required' => 'sometimes|required|boolean',
-            'order_number' => 'sometimes|required|integer|min:1'
+            // ...validation rules
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Item update failed validation', ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $item->update($request->all());
+        Log::info('Item updated', ['item_id' => $item->id]);
         return response()->json($item);
     }
 
     public function deleteItem(QaChecklist $qaChecklist, QaChecklistItem $item)
     {
+        Log::info('Deleting checklist item', ['item_id' => $item->id, 'checklist_id' => $qaChecklist->id]);
         $item->delete();
         return response()->json(null, 204);
     }

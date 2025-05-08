@@ -39,7 +39,6 @@ class ProfileController extends Controller
         ]);
 
         $userId = auth()->id();
-        \Log::info('Creating profile for user_id: ' . $userId);
 
         $profile = Profile::create([
             'user_id' => $userId,
