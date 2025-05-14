@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('bugs', BugController::class);
     Route::post('bugs/{bug}/fix', [BugController::class, 'fixBug']);
     Route::apiResource('qa-checklists', QaChecklistController::class);
+    Route::get('qa/stats', [QaChecklistController::class, 'getStats']);
 
     // QA Checklist Items
     Route::post('qa-checklists/{qaChecklist}/items', [QaChecklistController::class, 'addItem']);

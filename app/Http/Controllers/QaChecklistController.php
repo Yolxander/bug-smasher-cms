@@ -259,4 +259,84 @@ class QaChecklistController extends Controller
         Log::debug('Fetching assignments for checklist', ['checklist_id' => $qaChecklist->id]);
         return response()->json($qaChecklist->assignments()->with('user')->get());
     }
+
+    public function getStats()
+    {
+        try {
+            // Get current period stats
+            $currentPeriod = now()->subDays(30);
+
+            // Active Projects (QA Checklists)
+            $activeProjectsCount = QaChecklist::where('is_deleted', false)
+                ->where('status', 'active')
+                ->count();
+
+            $previousActiveProjectsCount = QaChecklist::where('is_deleted', false)
+                ->where('status', 'active')
+                ->where('created_at', '<', $currentPeriod)
+                ->count();
+
+            $activeProjectsChange = $previousActiveProjectsCount > 0
+                ? (($activeProjectsCount - $previousActiveProjectsCount) / $previousActiveProjectsCount) * 100
+                : 0;
+
+            // Completed Items
+            $completedItemsCount = QaChecklistItem::whereHas('responses', function($query) {
+                $query->where('status', 'completed');
+            })->count();
+
+            $previousCompletedItemsCount = QaChecklistItem::whereHas('responses', function($query) use ($currentPeriod) {
+                $query->where('status', 'completed')
+                    ->where('responded_at', '<', $currentPeriod);
+            })->count();
+
+            $completedItemsChange = $previousCompletedItemsCount > 0
+                ? (($completedItemsCount - $previousCompletedItemsCount) / $previousCompletedItemsCount) * 100
+                : 0;
+
+            // Active Reviewers
+            $activeReviewersCount = QaChecklistAssignment::where('status', 'accepted')
+                ->where('assigned_at', '>=', $currentPeriod)
+                ->distinct('user_id')
+                ->count('user_id');
+
+            $previousActiveReviewersCount = QaChecklistAssignment::where('status', 'accepted')
+                ->whereBetween('assigned_at', [$currentPeriod->copy()->subDays(30), $currentPeriod])
+                ->distinct('user_id')
+                ->count('user_id');
+
+            $activeReviewersChange = $previousActiveReviewersCount > 0
+                ? (($activeReviewersCount - $previousActiveReviewersCount) / $previousActiveReviewersCount) * 100
+                : 0;
+
+            return response()->json([
+                'activeProjects' => [
+                    'count' => $activeProjectsCount,
+                    'change' => round($activeProjectsChange, 2),
+                    'period' => '30 days'
+                ],
+                'completedItems' => [
+                    'count' => $completedItemsCount,
+                    'change' => round($completedItemsChange, 2),
+                    'period' => '30 days'
+                ],
+                'activeReviewers' => [
+                    'count' => $activeReviewersCount,
+                    'change' => round($activeReviewersChange, 2),
+                    'period' => '30 days'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching QA stats', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to fetch QA statistics',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
