@@ -14,7 +14,7 @@ class BugController extends Controller
      */
     public function index()
     {
-        $bugs = Bug::with('assignee')->get();
+        $bugs = Bug::with('assignee','fixes')->get();
         return response()->json($bugs);
     }
 
@@ -150,5 +150,41 @@ class BugController extends Controller
     {
         $bug->delete();
         return response()->json(null, 204);
+    }
+
+    /**
+     * Fix a bug: update status and save findings/solutions.
+     */
+    public function fixBug(Request $request, $bugId)
+    {
+        Log::info('Fix bug request received', [
+            'bug_id' => $bugId,
+            'request' => $request->all()
+        ]);
+
+        // Extract data from JSON:API format
+        $data = $request->input('data.attributes', []);
+
+        $validated = $request->validate([
+            'data.attributes.status' => 'required|string',
+            'data.attributes.findings' => 'required|string',
+            'data.attributes.solution' => 'required|string',
+        ]);
+
+        $bug = Bug::findOrFail($bugId);
+        $bug->status = $data['status'];
+        $bug->save();
+        Log::info('Bug status updated', ['bug_id' => $bugId, 'status' => $bug->status]);
+
+        $fix = $bug->fixes()->create([
+            'findings' => $data['findings'],
+            'solutions' => $data['solution'], // Note: changed from solutions to solution to match request
+        ]);
+        Log::info('Bug fix saved', ['bug_fix_id' => $fix->id, 'bug_id' => $bugId]);
+
+        return response()->json([
+            'bug' => $bug,
+            'fix' => $fix
+        ]);
     }
 }

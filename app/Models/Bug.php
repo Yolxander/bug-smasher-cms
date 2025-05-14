@@ -64,4 +64,9 @@ class Bug extends Model
     {
         return $this->belongsTo(QaChecklistItem::class, 'qa_list_item_id');
     }
+
+    public function fixes()
+    {
+        return $this->hasMany(BugFix::class);
+    }
 }
