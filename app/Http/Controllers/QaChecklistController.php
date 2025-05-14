@@ -16,20 +16,8 @@ class QaChecklistController extends Controller
     public function index()
     {
         try {
-            Log::info('QA Checklist API Request', [
-                'endpoint' => 'GET /api/qa-checklists',
-                'user_id' => auth()->id(),
-                'user_email' => auth()->user()->email,
-                'timestamp' => now()->toIso8601String(),
-                'request_data' => request()->all(),
-                'headers' => request()->headers->all()
-            ]);
 
             if (!auth()->check()) {
-                Log::warning('QA Checklist API Unauthorized Access', [
-                    'endpoint' => 'GET /api/qa-checklists',
-                    'timestamp' => now()->toIso8601String()
-                ]);
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
 
@@ -38,41 +26,13 @@ class QaChecklistController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
 
-            Log::info('QA Checklist API Response', [
-                'endpoint' => 'GET /api/qa-checklists',
-                'status' => 'success',
-                'checklists_count' => $checklists->count(),
-                'total_pages' => $checklists->lastPage(),
-                'current_page' => $checklists->currentPage(),
-                'per_page' => $checklists->perPage(),
-                'timestamp' => now()->toIso8601String()
-            ]);
-
             return response()->json($checklists);
         } catch (\Illuminate\Database\QueryException $e) {
-            Log::error('QA Checklist API Database Error', [
-                'endpoint' => 'GET /api/qa-checklists',
-                'error' => $e->getMessage(),
-                'sql' => $e->getSql(),
-                'bindings' => $e->getBindings(),
-                'trace' => $e->getTraceAsString(),
-                'timestamp' => now()->toIso8601String()
-            ]);
-
             return response()->json([
                 'error' => 'Database error occurred',
                 'message' => $e->getMessage()
             ], 500);
         } catch (\Exception $e) {
-            Log::error('QA Checklist API Error', [
-                'endpoint' => 'GET /api/qa-checklists',
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-                'timestamp' => now()->toIso8601String()
-            ]);
-
             return response()->json([
                 'error' => 'Failed to fetch QA checklists',
                 'message' => $e->getMessage()
@@ -248,6 +208,7 @@ class QaChecklistController extends Controller
         return response()->json($qaChecklist->getCompletedItems());
     }
 
+    ///UPDATE ITEM FUNCTION
     public function updateItem(Request $request, QaChecklist $qaChecklist, QaChecklistItem $item)
     {
         Log::debug('Updating checklist item', [
@@ -257,7 +218,9 @@ class QaChecklistController extends Controller
         ]);
 
         $validator = Validator::make($request->all(), [
-            // ...validation rules
+            'order_number' => 'required|integer',
+            'status' => 'required|in:passed,failed,pending',
+            'answer' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -265,7 +228,12 @@ class QaChecklistController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $item->update($request->all());
+        $item->update([
+            'order_number' => $request->order_number,
+            'status' => $request->status,
+            'answer' => $request->answer
+        ]);
+
         Log::info('Item updated', ['item_id' => $item->id]);
         return response()->json($item);
     }

@@ -14,13 +14,35 @@ class QaChecklistItem extends Model
         'item_text',
         'item_type',
         'is_required',
-        'order_number'
+        'order_number',
+        'identifier',
+        'answer',
+        'status'
     ];
 
     protected $casts = [
         'is_required' => 'boolean',
         'order_number' => 'integer'
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            // Get the last identifier
+            $lastItem = self::orderBy('id', 'desc')->first();
+
+            if ($lastItem && preg_match('/#U(\d+)/', $lastItem->identifier, $matches)) {
+                $nextNumber = (int)$matches[1] + 1;
+            } else {
+                $nextNumber = 1;
+            }
+
+            // Generate new identifier with leading zeros
+            $model->identifier = '#U' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        });
+    }
 
     // Relationships
     public function checklist()

@@ -218,12 +218,10 @@ class QaChecklistResource extends Resource
                                     ->columnSpanFull(),
                                 Forms\Components\Select::make('item_type')
                                     ->options([
-                                        'checkbox' => 'Checkbox',
-                                        'radio' => 'Radio',
                                         'text' => 'Text',
                                     ])
                                     ->required()
-                                    ->default('checkbox'),
+                                    ->default('text'),
                                 Forms\Components\Toggle::make('is_required')
                                     ->required()
                                     ->default(false),

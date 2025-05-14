@@ -29,7 +29,8 @@ class Bug extends Model
         'browser',
         'os',
         'url',
-        'screenshot'
+        'screenshot',
+        'qa_list_item_id'
     ];
 
     protected $casts = [
@@ -46,16 +47,21 @@ class Bug extends Model
 
     public function assignedTo()
     {
-        return $this->belongsTo(Profile::class, 'assigned_to');
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function reportedBy()
     {
-        return $this->belongsTo(Profile::class, 'reported_by');
+        return $this->belongsTo(User::class, 'reported_by');
     }
 
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function qaListItem()
+    {
+        return $this->belongsTo(QaChecklistItem::class, 'qa_list_item_id');
     }
 }
