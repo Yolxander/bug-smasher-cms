@@ -220,7 +220,8 @@ class QaChecklistController extends Controller
         $validator = Validator::make($request->all(), [
             'order_number' => 'required|integer',
             'status' => 'required|in:passed,failed,pending',
-            'answer' => 'nullable|string'
+            'answer' => 'nullable|string',
+            'failure_reason' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -231,7 +232,8 @@ class QaChecklistController extends Controller
         $item->update([
             'order_number' => $request->order_number,
             'status' => $request->status,
-            'answer' => $request->answer
+            'answer' => $request->answer,
+            'failure_reason' => $request->failure_reason
         ]);
 
         Log::info('Item updated', ['item_id' => $item->id]);

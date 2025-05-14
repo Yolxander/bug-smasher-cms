@@ -17,7 +17,8 @@ class QaChecklistItem extends Model
         'order_number',
         'identifier',
         'answer',
-        'status'
+        'status',
+        'failure_reason'
     ];
 
     protected $casts = [
