@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Bug;
 use Illuminate\Support\Facades\Log;
+use App\Models\QaChecklistItem;
 
 class BugController extends Controller
 {
@@ -56,6 +57,14 @@ class BugController extends Controller
             'os' => $environment['os'] ?? null,
         ];
 
+        // If relatedItem is provided, find the QaChecklistItem and link it
+        if (isset($data['relatedItem'])) {
+            $qaListItem = QaChecklistItem::where('identifier', $data['relatedItem'])->first();
+            if ($qaListItem) {
+                $mappedData['qa_list_item_id'] = $qaListItem->id;
+            }
+        }
+
         // Log the mapped data for debugging
         Log::info('Mapped data', [
             'mapped_data' => $mappedData
@@ -74,7 +83,8 @@ class BugController extends Controller
             'priority' => 'nullable|string',
             'assignee_id' => 'nullable|exists:users,id',
             'url' => 'nullable|string',
-            'screenshot' => 'nullable|string'
+            'screenshot' => 'nullable|string',
+            'qa_list_item_id' => 'nullable|exists:qa_checklist_items,id'
         ]);
 
         // Log the validated data

@@ -21,7 +21,7 @@ class QaChecklistController extends Controller
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
 
-            $checklists = QaChecklist::with(['creator', 'items', 'assignments.user', 'assignedUsers'])
+            $checklists = QaChecklist::with(['creator', 'items.bugs', 'assignments.user', 'assignedUsers'])
                 ->where('is_deleted', false)
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
@@ -84,6 +84,7 @@ class QaChecklistController extends Controller
         Log::debug('Showing checklist', ['id' => $qaChecklist->id]);
         return response()->json($qaChecklist->load([
             'items',
+            'items.bugs',
             'responses',
             'creator',
             'assignments.user',

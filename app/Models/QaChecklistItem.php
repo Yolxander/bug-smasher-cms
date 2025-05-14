@@ -55,4 +55,9 @@ class QaChecklistItem extends Model
     {
         return $this->hasMany(QaChecklistResponse::class, 'item_id');
     }
+
+    public function bugs()
+    {
+        return $this->hasMany(Bug::class, 'qa_list_item_id');
+    }
 }
