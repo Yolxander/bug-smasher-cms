@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('os')->nullable();
             $table->string('status')->default('Open');
             $table->string('priority')->default('Medium');
-            $table->foreignId('assignee_id')->nullable()->constrained('profiles')->nullOnDelete();
+            $table->foreignId('assignee_id')->nullable()->constrained('users')->nullOnDelete();
             $table->jsonb('project')->default('{"id": "1", "name": "Clever Project"}');
             $table->string('url')->nullable();
             $table->string('screenshot')->nullable();

@@ -134,7 +134,7 @@ class BugController extends Controller
             'os' => 'nullable|string',
             'status' => 'nullable|string',
             'priority' => 'nullable|string',
-            'assignee_id' => 'nullable|exists:users,id',
+            'assignee_id' => 'nullable|exists:profiles,id',
             'url' => 'nullable|string',
             'screenshot' => 'nullable|string'
         ]);
