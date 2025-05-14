@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Bug;
+use Illuminate\Support\Facades\Log;
 
 class BugController extends Controller
 {
@@ -29,6 +30,37 @@ class BugController extends Controller
      */
     public function store(Request $request)
     {
+        // Log the incoming request data
+        Log::info('Bug report received', [
+            'request_data' => $request->all()
+        ]);
+
+        // Extract data from JSON:API format
+        $data = $request->input('data.attributes', []);
+        $environment = $data['environment'] ?? [];
+
+        // Map the data to our model's structure
+        $mappedData = [
+            'title' => $data['title'] ?? null,
+            'description' => $data['description'] ?? null,
+            'steps_to_reproduce' => $data['steps_to_reproduce'] ?? null,
+            'expected_behavior' => $data['expected_behavior'] ?? null,
+            'actual_behavior' => $data['actual_behavior'] ?? null,
+            'status' => $data['status'] ?? null,
+            'priority' => $data['priority'] ?? null,
+            'assignee_id' => $data['assignee_id'] ?? null,
+            'url' => $data['url'] ?? null,
+            'screenshot' => $data['screenshot'] ?? null,
+            'device' => $environment['device'] ?? null,
+            'browser' => $environment['browser'] ?? null,
+            'os' => $environment['os'] ?? null,
+        ];
+
+        // Log the mapped data for debugging
+        Log::info('Mapped data', [
+            'mapped_data' => $mappedData
+        ]);
+
         $validated = $request->validate([
             'title' => 'nullable|string',
             'description' => 'nullable|string',
@@ -40,13 +72,23 @@ class BugController extends Controller
             'os' => 'nullable|string',
             'status' => 'nullable|string',
             'priority' => 'nullable|string',
-            'assignee_id' => 'nullable|exists:profiles,id',
-            'project' => 'nullable|array',
+            'assignee_id' => 'nullable|exists:users,id',
             'url' => 'nullable|string',
             'screenshot' => 'nullable|string'
         ]);
 
-        $bug = Bug::create($validated);
+        // Log the validated data
+        Log::info('Bug report validated', [
+            'validated_data' => $validated
+        ]);
+
+        $bug = Bug::create($mappedData);
+
+        // Log the created bug
+        Log::info('Bug created', [
+            'bug' => $bug->toArray()
+        ]);
+
         return response()->json($bug->load('assignee'), 201);
     }
 
