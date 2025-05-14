@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
+use Illuminate\Database\Eloquent\Builder;
 
 class BugResource extends Resource
 {
@@ -34,7 +35,7 @@ class BugResource extends Resource
                             ->maxLength(255),
                         Select::make('status')
                             ->options([
-                                'new' => 'New',
+                                'open' => 'Open',
                                 'in_progress' => 'In Progress',
                                 'resolved' => 'Resolved',
                                 'closed' => 'Closed',
@@ -59,12 +60,12 @@ class BugResource extends Resource
 
                 Section::make('Assignment')
                     ->schema([
-                        Select::make('assigned_to')
-                            ->relationship('assignedTo', 'full_name')
+                        Select::make('assignee_id')
+                            ->relationship('assignedTo', 'name')
                             ->searchable()
                             ->preload(),
                         Select::make('reported_by')
-                            ->relationship('reportedBy', 'full_name')
+                            ->relationship('reportedBy', 'name')
                             ->searchable()
                             ->preload(),
                         Select::make('team_id')
@@ -100,24 +101,28 @@ class BugResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match (strtolower($state)) {
                         'open' => 'danger',
                         'in_progress' => 'warning',
                         'resolved' => 'success',
                         'closed' => 'gray',
+                        default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match (strtolower($state)) {
                         'low' => 'gray',
                         'medium' => 'info',
                         'high' => 'warning',
                         'critical' => 'danger',
+                        default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('assignedTo.full_name')
+                Tables\Columns\TextColumn::make('assignedTo.name')
                     ->label('Assigned To')
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('reportedBy.full_name')
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy('assignee_id', $direction);
+                    }),
+                Tables\Columns\TextColumn::make('reportedBy.name')
                     ->label('Reported By')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('team.name')
@@ -149,8 +154,8 @@ class BugResource extends Resource
                         'high' => 'High',
                         'critical' => 'Critical',
                     ]),
-                Tables\Filters\SelectFilter::make('assigned_to')
-                    ->relationship('assignedTo', 'full_name'),
+                Tables\Filters\SelectFilter::make('assignee_id')
+                    ->relationship('assignedTo', 'name'),
                 Tables\Filters\SelectFilter::make('team')
                     ->relationship('team', 'name'),
             ])
