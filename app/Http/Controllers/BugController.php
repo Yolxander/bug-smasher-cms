@@ -55,6 +55,8 @@ class BugController extends Controller
             'device' => $environment['device'] ?? null,
             'browser' => $environment['browser'] ?? null,
             'os' => $environment['os'] ?? null,
+            'team_id' => $data['team_id'] ?? null,
+            'reported_by' => $data['reported_by'] ?? null,
         ];
 
         // If relatedItem is provided, find the QaChecklistItem and link it
@@ -84,7 +86,9 @@ class BugController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
             'url' => 'nullable|string',
             'screenshot' => 'nullable|string',
-            'qa_list_item_id' => 'nullable|exists:qa_checklist_items,id'
+            'qa_list_item_id' => 'nullable|exists:qa_checklist_items,id',
+            'team_id' => 'nullable|exists:teams,id',
+            'reported_by' => 'nullable|exists:users,id'
         ]);
 
         // Log the validated data
@@ -99,7 +103,7 @@ class BugController extends Controller
             'bug' => $bug->toArray()
         ]);
 
-        return response()->json($bug->load('assignee'), 201);
+        return response()->json($bug->load(['assignee', 'team']), 201);
     }
 
     /**

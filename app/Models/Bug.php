@@ -30,7 +30,8 @@ class Bug extends Model
         'os',
         'url',
         'screenshot',
-        'qa_list_item_id'
+        'qa_list_item_id',
+        'team_id'
     ];
 
     protected $casts = [

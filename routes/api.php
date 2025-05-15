@@ -48,10 +48,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('qa-checklists/{qaChecklist}/responses', [QaChecklistController::class, 'getResponses']);
 
     // Teams
-    Route::apiResource('teams', TeamController::class);
-    Route::post('teams/{team}/invite', [TeamController::class, 'invite']);
-    Route::post('teams/invitations/{token}/accept', [TeamController::class, 'acceptInvitation']);
-    Route::post('teams/invitations/{token}/decline', [TeamController::class, 'declineInvitation']);
-    Route::delete('teams/{team}/members/{member}', [TeamController::class, 'removeMember']);
-    Route::put('teams/{team}/members/{member}/role', [TeamController::class, 'updateMemberRole']);
+    Route::apiResource('teams', \App\Http\Controllers\Api\TeamController::class);
+    Route::get('teams/{team}/members', [\App\Http\Controllers\Api\TeamController::class, 'getMembers']);
+    Route::post('teams/{team}/members', [\App\Http\Controllers\Api\TeamController::class, 'addMember']);
+    Route::delete('teams/{team}/members/{member}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember']);
+    Route::put('teams/{team}/members/{member}/role', [\App\Http\Controllers\Api\TeamController::class, 'updateMemberRole']);
+    Route::get('teams/member/{memberId}', [\App\Http\Controllers\Api\TeamController::class, 'getTeamsByMemberId']);
 });
