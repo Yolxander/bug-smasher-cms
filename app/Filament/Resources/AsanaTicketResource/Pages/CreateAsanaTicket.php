@@ -56,10 +56,38 @@ class CreateAsanaTicket extends CreateRecord
             // Create the task in Asana
             $asanaResponse = $asanaService->createTask($taskData);
 
+            // Store the Asana task ID
+            $this->record->update([
+                'asana_task_id' => $asanaResponse['data']['gid']
+            ]);
+
+            // If QA checklist, create subtasks for all items in the checklist
+            if ($this->record->ticket_type === 'qa_checklist' && $this->record->qaChecklistItem) {
+                $checklist = $this->record->qaChecklistItem->checklist;
+                if ($checklist) {
+                    foreach ($checklist->items as $item) {
+                        try {
+                            $asanaService->createSubtask(
+                                $asanaResponse['data']['gid'],
+                                $item->item_text,
+                                "Type: {$item->item_type}" . ($item->is_required ? ' (Required)' : '')
+                            );
+                        } catch (\Exception $e) {
+                            Log::error('Failed to create Asana subtask', [
+                                'asana_task_id' => $asanaResponse['data']['gid'],
+                                'item_id' => $item->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                }
+            }
+
             // Log the successful creation
             Log::info('Asana ticket created successfully', [
                 'ticket_id' => $this->record->id,
                 'ticket_number' => $this->record->ticket_number,
+                'asana_task_id' => $asanaResponse['data']['gid'],
                 'asana_response' => $asanaResponse
             ]);
 

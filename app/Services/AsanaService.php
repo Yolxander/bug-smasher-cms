@@ -78,6 +78,99 @@ class AsanaService
     }
 
     /**
+     * Update an existing task in Asana
+     */
+    public function updateTask(string $asanaTaskId, array $data): array
+    {
+        try {
+            Log::info('Attempting to update Asana task', [
+                'task_id' => $asanaTaskId,
+                'data' => $data
+            ]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+                'Content-Type' => 'application/json',
+            ])->put("{$this->baseUrl}/tasks/{$asanaTaskId}", [
+                'data' => [
+                    'name' => $data['title'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                ]
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                Log::info('Asana task updated successfully', [
+                    'task_id' => $asanaTaskId,
+                    'response' => $responseData
+                ]);
+                return $responseData;
+            }
+
+            $errorResponse = $response->json();
+            $errorMessage = $errorResponse['errors'][0]['message'] ?? 'Unknown error';
+
+            Log::error('Failed to update Asana task', [
+                'task_id' => $asanaTaskId,
+                'status' => $response->status(),
+                'response' => $errorResponse,
+                'request_data' => $data
+            ]);
+
+            throw new \Exception("Failed to update Asana task: {$errorMessage}");
+
+        } catch (\Exception $e) {
+            Log::error('Error updating Asana task', [
+                'task_id' => $asanaTaskId,
+                'error' => $e->getMessage(),
+                'request_data' => $data
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Delete a task in Asana
+     */
+    public function deleteTask(string $asanaTaskId): bool
+    {
+        try {
+            Log::info('Attempting to delete Asana task', [
+                'task_id' => $asanaTaskId
+            ]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+            ])->delete("{$this->baseUrl}/tasks/{$asanaTaskId}");
+
+            if ($response->successful()) {
+                Log::info('Asana task deleted successfully', [
+                    'task_id' => $asanaTaskId
+                ]);
+                return true;
+            }
+
+            $errorResponse = $response->json();
+            $errorMessage = $errorResponse['errors'][0]['message'] ?? 'Unknown error';
+
+            Log::error('Failed to delete Asana task', [
+                'task_id' => $asanaTaskId,
+                'status' => $response->status(),
+                'response' => $errorResponse
+            ]);
+
+            throw new \Exception("Failed to delete Asana task: {$errorMessage}");
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting Asana task', [
+                'task_id' => $asanaTaskId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Get project details
      */
     public function getProjectDetails(): array
@@ -129,6 +222,38 @@ class AsanaService
                 'error' => $e->getMessage()
             ]);
             return false;
+        }
+    }
+
+    /**
+     * Create a subtask in Asana
+     */
+    public function createSubtask(string $parentTaskId, string $name, string $notes = ''): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/tasks/{$parentTaskId}/subtasks", [
+                'data' => [
+                    'name' => $name,
+                    'notes' => $notes,
+                    'workspace' => $this->workspaceId,
+                ]
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            throw new \Exception('Failed to create Asana subtask: ' . $response->body());
+        } catch (\Exception $e) {
+            Log::error('Error creating Asana subtask', [
+                'error' => $e->getMessage(),
+                'parent_task_id' => $parentTaskId,
+                'name' => $name,
+            ]);
+            throw $e;
         }
     }
 }
