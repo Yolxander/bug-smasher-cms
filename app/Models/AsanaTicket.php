@@ -86,8 +86,10 @@ class AsanaTicket extends Model
                                            "Actual Behavior: {$ticket->bug->actual_behavior}\n\n" .
                                            "Additional Notes: {$ticket->notes}";
                     } elseif ($ticket->ticket_type === 'qa_checklist' && $ticket->qaChecklistItem) {
-                        $taskData['title'] = "[QA] {$ticket->qaChecklistItem->item_text} - {$ticket->ticket_number}";
-                        $taskData['notes'] = "QA Checklist Item: {$ticket->qaChecklistItem->item_text}\n\n" .
+                        $checklist = $ticket->qaChecklistItem->checklist;
+                        $taskData['title'] = "[QA] {$checklist->title} - {$ticket->ticket_number}";
+                        $taskData['notes'] = "QA Checklist: {$checklist->title}\n\n" .
+                                           "Description: {$checklist->description}\n\n" .
                                            "Additional Notes: {$ticket->notes}";
                     }
 

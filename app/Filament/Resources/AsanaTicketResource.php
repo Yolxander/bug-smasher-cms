@@ -35,7 +35,7 @@ class AsanaTicketResource extends Resource
                             ->label('Ticket Type')
                             ->options([
                                 'bug' => 'Bug',
-                                'qa_checklist' => 'QA Checklist Item',
+                                'qa_checklist' => 'QA Checklist',
                             ])
                             ->required()
                             ->live(),
@@ -46,11 +46,12 @@ class AsanaTicketResource extends Resource
                             ->visible(fn (Get $get): bool => $get('ticket_type') === 'bug')
                             ->required(fn (Get $get): bool => $get('ticket_type') === 'bug'),
                         Select::make('qa_checklist_item_id')
-                            ->relationship('qaChecklistItem', 'item_text')
+                            ->relationship('qaChecklistItem.checklist', 'title')
                             ->searchable()
                             ->preload()
                             ->visible(fn (Get $get): bool => $get('ticket_type') === 'qa_checklist')
-                            ->required(fn (Get $get): bool => $get('ticket_type') === 'qa_checklist'),
+                            ->required(fn (Get $get): bool => $get('ticket_type') === 'qa_checklist')
+                            ->label('QA Checklist'),
                         Select::make('status')
                             ->options([
                                 'open' => 'Open',

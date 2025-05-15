@@ -48,22 +48,24 @@ class CreateAsanaTicket extends CreateRecord
                                    "Actual Behavior: {$this->record->bug->actual_behavior}\n\n" .
                                    "Additional Notes: {$this->record->notes}";
             } elseif ($this->record->ticket_type === 'qa_checklist' && $this->record->qaChecklistItem) {
-                $taskData['title'] = "[QA] {$this->record->qaChecklistItem->item_text} - {$this->record->ticket_number}";
-                $taskData['notes'] = "QA Checklist Item: {$this->record->qaChecklistItem->item_text}\n\n" .
-                                   "Additional Notes: {$this->record->notes}";
-            }
-
-            // Create the task in Asana
-            $asanaResponse = $asanaService->createTask($taskData);
-
-            // Store the Asana task ID
-            $this->record->update([
-                'asana_task_id' => $asanaResponse['data']['gid']
-            ]);
-
-            // If QA checklist, create subtasks for all items in the checklist
-            if ($this->record->ticket_type === 'qa_checklist' && $this->record->qaChecklistItem) {
+                // Get the checklist through the qaChecklistItem relationship
                 $checklist = $this->record->qaChecklistItem->checklist;
+
+                // Use the checklist title for the task
+                $taskData['title'] = "[QA] {$checklist->title} - {$this->record->ticket_number}";
+                $taskData['notes'] = "QA Checklist: {$checklist->title}\n\n" .
+                                   "Description: {$checklist->description}\n\n" .
+                                   "Additional Notes: {$this->record->notes}";
+
+                // Create the task in Asana
+                $asanaResponse = $asanaService->createTask($taskData);
+
+                // Store the Asana task ID
+                $this->record->update([
+                    'asana_task_id' => $asanaResponse['data']['gid']
+                ]);
+
+                // Create subtasks for all items in the checklist
                 if ($checklist) {
                     foreach ($checklist->items as $item) {
                         try {
