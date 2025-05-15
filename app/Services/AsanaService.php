@@ -256,4 +256,53 @@ class AsanaService
             throw $e;
         }
     }
+
+    /**
+     * Update a subtask's completion status in Asana
+     */
+    public function updateSubtaskStatus(string $subtaskId, bool $completed): array
+    {
+        try {
+            Log::info('Attempting to update Asana subtask status', [
+                'subtask_id' => $subtaskId,
+                'completed' => $completed
+            ]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+                'Content-Type' => 'application/json',
+            ])->put("{$this->baseUrl}/tasks/{$subtaskId}", [
+                'data' => [
+                    'completed' => $completed
+                ]
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                Log::info('Asana subtask status updated successfully', [
+                    'subtask_id' => $subtaskId,
+                    'completed' => $completed
+                ]);
+                return $responseData;
+            }
+
+            $errorResponse = $response->json();
+            $errorMessage = $errorResponse['errors'][0]['message'] ?? 'Unknown error';
+
+            Log::error('Failed to update Asana subtask status', [
+                'subtask_id' => $subtaskId,
+                'status' => $response->status(),
+                'response' => $errorResponse
+            ]);
+
+            throw new \Exception("Failed to update Asana subtask status: {$errorMessage}");
+
+        } catch (\Exception $e) {
+            Log::error('Error updating Asana subtask status', [
+                'subtask_id' => $subtaskId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
 }
