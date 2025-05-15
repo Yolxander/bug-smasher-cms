@@ -37,11 +37,6 @@ class BugController extends Controller
      */
     public function store(Request $request)
     {
-        // Log the incoming request data
-        Log::info('Bug report received', [
-            'request_data' => $request->all()
-        ]);
-
         try {
             // Validate the request data first
             $validated = $request->validate([
@@ -70,16 +65,72 @@ class BugController extends Controller
                 'team_id' => 'nullable|exists:teams,id',
                 'reported_by' => 'nullable|exists:users,id',
                 'qa_list_item_id' => 'nullable|exists:qa_checklist_items,id',
-                'screenshot' => 'nullable|file|image|max:10240', // Max 10MB
+                'screenshot' => ['nullable', function ($attribute, $value, $fail) use ($request) {
+                    if (is_string($value) && Str::startsWith($value, 'data:image')) {
+                        // Validate base64 image
+                        $imageData = explode(',', $value);
+                        if (count($imageData) !== 2) {
+                            $fail('Invalid image data format.');
+                            return;
+                        }
+                        $decodedImage = base64_decode($imageData[1]);
+                        if ($decodedImage === false) {
+                            $fail('Invalid base64 image data.');
+                            return;
+                        }
+                        // Check file size (10MB limit)
+                        if (strlen($decodedImage) > 10 * 1024 * 1024) {
+                            $fail('The screenshot must not be greater than 10MB.');
+                            return;
+                        }
+                        // Check if it's a valid image
+                        if (!getimagesizefromstring($decodedImage)) {
+                            $fail('The screenshot must be a valid image.');
+                            return;
+                        }
+                    } elseif ($request->hasFile('screenshot')) {
+                        // Validate file upload
+                        $file = $request->file('screenshot');
+                        if (!$file->isValid()) {
+                            $fail('Invalid file upload.');
+                            return;
+                        }
+                        if (!$file->getMimeType() || !Str::startsWith($file->getMimeType(), 'image/')) {
+                            $fail('The screenshot must be an image.');
+                            return;
+                        }
+                        if ($file->getSize() > 10 * 1024 * 1024) {
+                            $fail('The screenshot must not be greater than 10MB.');
+                            return;
+                        }
+                    }
+                }],
             ]);
 
             Log::info('Validation passed', ['validated_data' => $validated]);
 
             // Handle screenshot upload if present
             $screenshotUrl = null;
-            if ($request->hasFile('screenshot')) {
+            if ($request->has('screenshot')) {
                 try {
-                    $screenshotUrl = $this->uploadScreenshotToFirebase($request->file('screenshot'));
+                    if (is_string($request->screenshot) && Str::startsWith($request->screenshot, 'data:image')) {
+                        // Handle base64 image
+                        $imageData = explode(',', $request->screenshot);
+                        $decodedImage = base64_decode($imageData[1]);
+                        $extension = explode('/', explode(';', $imageData[0])[0])[1];
+                        $filename = 'screenshot_' . time() . '.' . $extension;
+
+                        // Save to storage
+                        $path = storage_path('app/public/screenshots/' . $filename);
+                        file_put_contents($path, $decodedImage);
+
+                        // Get public URL
+                        $screenshotUrl = asset('storage/screenshots/' . $filename);
+                    } elseif ($request->hasFile('screenshot')) {
+                        // Handle file upload
+                        $screenshotUrl = $this->uploadScreenshotToFirebase($request->file('screenshot'));
+                    }
+
                     Log::info('Screenshot uploaded successfully', ['url' => $screenshotUrl]);
                 } catch (\Exception $e) {
                     Log::error('Failed to upload screenshot', [

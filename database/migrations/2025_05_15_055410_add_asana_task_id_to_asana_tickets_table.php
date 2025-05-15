@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('asana_tickets', function (Blueprint $table) {
-            $table->string('asana_task_id')->nullable()->after('ticket_number');
+            if (!Schema::hasColumn('asana_tickets', 'asana_task_id')) {
+                $table->string('asana_task_id')->nullable()->after('ticket_number');
+            }
         });
     }
 
@@ -22,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('asana_tickets', function (Blueprint $table) {
-            $table->dropColumn('asana_task_id');
+            if (Schema::hasColumn('asana_tickets', 'asana_task_id')) {
+                $table->dropColumn('asana_task_id');
+            }
         });
     }
 };
