@@ -70,4 +70,9 @@ class Bug extends Model
     {
         return $this->hasMany(BugFix::class);
     }
+
+    public function asanaTickets()
+    {
+        return $this->hasMany(AsanaTicket::class);
+    }
 }

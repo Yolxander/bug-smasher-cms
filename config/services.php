@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'asana' => [
+        'pat' => env('ASANA_PAT'),
+        'workspace_id' => env('ASANA_WORKSPACE_ID'),
+        'project_id' => env('ASANA_PROJECT_ID'),
+    ],
+
 ];
