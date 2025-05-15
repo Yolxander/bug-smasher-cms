@@ -30,67 +30,66 @@ class CreateAsanaTicket extends CreateRecord
 
     protected function afterCreate(): void
     {
+        $record = $this->record;
+        $asanaService = new AsanaService();
+
         try {
-            // Create Asana task
-            $asanaService = new AsanaService();
+            $taskData = [];
 
-            // Prepare task data based on ticket type
-            $taskData = [
-                'title' => $this->record->ticket_number,
-                'notes' => $this->record->notes ?? '',
-            ];
+            if ($record->ticket_type === 'bug') {
+                $bug = $record->bug;
+                $taskData = [
+                    'title' => "[Bug] {$bug->title} - {$record->ticket_number}",
+                    'notes' => "**Description:**\n{$bug->description}\n\n" .
+                        "**Steps to Reproduce:**\n{$bug->steps_to_reproduce}\n\n" .
+                        "**Expected Behavior:**\n{$bug->expected_behavior}\n\n" .
+                        "**Actual Behavior:**\n{$bug->actual_behavior}\n\n" .
+                        "**Additional Notes:**\n{$bug->additional_notes}"
+                ];
+            } elseif ($record->ticket_type === 'qa_checklist') {
+                $checklistItem = $record->qaChecklistItem;
+                $checklist = $checklistItem->checklist;
+                $taskData = [
+                    'title' => "[QA] {$checklist->title} - {$record->ticket_number}",
+                    'notes' => "**Checklist Title:** {$checklist->title}\n\n" .
+                        "**Description:**\n{$checklist->description}"
+                ];
+            }
 
-            if ($this->record->ticket_type === 'bug' && $this->record->bug) {
-                $taskData['title'] = "[Bug] {$this->record->bug->title} - {$this->record->ticket_number}";
-                $taskData['notes'] = "Bug Description: {$this->record->bug->description}\n\n" .
-                                   "Steps to Reproduce: {$this->record->bug->steps_to_reproduce}\n\n" .
-                                   "Expected Behavior: {$this->record->bug->expected_behavior}\n\n" .
-                                   "Actual Behavior: {$this->record->bug->actual_behavior}\n\n" .
-                                   "Additional Notes: {$this->record->notes}";
-            } elseif ($this->record->ticket_type === 'qa_checklist' && $this->record->qaChecklistItem) {
-                // Get the checklist through the qaChecklistItem relationship
-                $checklist = $this->record->qaChecklistItem->checklist;
+            // Create the main task in Asana
+            $asanaResponse = $asanaService->createTask($taskData);
+            $record->update(['asana_task_id' => $asanaResponse['data']['gid']]);
 
-                // Use the checklist title for the task
-                $taskData['title'] = "[QA] {$checklist->title} - {$this->record->ticket_number}";
-                $taskData['notes'] = "QA Checklist: {$checklist->title}\n\n" .
-                                   "Description: {$checklist->description}\n\n" .
-                                   "Additional Notes: {$this->record->notes}";
+            // If it's a QA checklist ticket, create subtasks for all items
+            if ($record->ticket_type === 'qa_checklist') {
+                $checklist = $record->qaChecklistItem->checklist;
+                foreach ($checklist->items as $item) {
+                    try {
+                        // Create subtask
+                        $subtaskResponse = $asanaService->createSubtask(
+                            $asanaResponse['data']['gid'],
+                            $item->item_text
+                        );
 
-                // Create the task in Asana
-                $asanaResponse = $asanaService->createTask($taskData);
-
-                // Store the Asana task ID
-                $this->record->update([
-                    'asana_task_id' => $asanaResponse['data']['gid']
-                ]);
-
-                // Create subtasks for all items in the checklist
-                if ($checklist) {
-                    foreach ($checklist->items as $item) {
-                        try {
-                            $asanaService->createSubtask(
-                                $asanaResponse['data']['gid'],
-                                $item->item_text,
-                                "Type: {$item->item_type}" . ($item->is_required ? ' (Required)' : '')
+                        // If the item is already passed, mark the subtask as completed
+                        if ($item->status === 'passed') {
+                            $asanaService->updateSubtaskStatus(
+                                $subtaskResponse['data']['gid'],
+                                true
                             );
-                        } catch (\Exception $e) {
-                            Log::error('Failed to create Asana subtask', [
-                                'asana_task_id' => $asanaResponse['data']['gid'],
-                                'item_id' => $item->id,
-                                'error' => $e->getMessage()
-                            ]);
                         }
+                    } catch (\Exception $e) {
+                        Log::error('Failed to create Asana subtask', [
+                            'error' => $e->getMessage(),
+                            'item_id' => $item->id
+                        ]);
                     }
                 }
             }
 
-            // Log the successful creation
             Log::info('Asana ticket created successfully', [
-                'ticket_id' => $this->record->id,
-                'ticket_number' => $this->record->ticket_number,
-                'asana_task_id' => $asanaResponse['data']['gid'],
-                'asana_response' => $asanaResponse
+                'ticket_id' => $record->id,
+                'asana_task_id' => $asanaResponse['data']['gid']
             ]);
 
             // Show success notification
@@ -101,15 +100,13 @@ class CreateAsanaTicket extends CreateRecord
                 ->send();
 
         } catch (\Exception $e) {
-            Log::error('Error creating Asana ticket', [
+            Log::error('Failed to create Asana ticket', [
                 'error' => $e->getMessage(),
-                'ticket_id' => $this->record->id
+                'ticket_id' => $record->id
             ]);
-
-            // Show error notification
             Notification::make()
                 ->title('Error creating Asana ticket')
-                ->body('There was an error creating the ticket in Asana. Please try again.')
+                ->body('The ticket was created in the system but failed to sync with Asana.')
                 ->danger()
                 ->send();
         }
