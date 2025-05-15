@@ -6,15 +6,27 @@ use Illuminate\Http\Request;
 use App\Models\Bug;
 use Illuminate\Support\Facades\Log;
 use App\Models\QaChecklistItem;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Services\FirebaseService;
 
 class BugController extends Controller
 {
+    use AuthorizesRequests;
+
+    protected $firebaseService;
+
+    public function __construct(FirebaseService $firebaseService)
+    {
+        $this->firebaseService = $firebaseService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $bugs = Bug::with('assignee','fixes')->get();
+        $this->authorize('viewAny', Bug::class);
+        $bugs = Bug::with('assignee', 'fixes', 'team')->get();
         return response()->json($bugs);
     }
 
@@ -31,6 +43,8 @@ class BugController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Bug::class);
+
         // Log the incoming request data
         Log::info('Bug report received', [
             'request_data' => $request->all()
@@ -39,6 +53,25 @@ class BugController extends Controller
         // Extract data from JSON:API format
         $data = $request->input('data.attributes', []);
         $environment = $data['environment'] ?? [];
+
+        // Handle file upload if present
+        $screenshotUrl = null;
+        if ($request->hasFile('screenshot')) {
+            try {
+                $screenshotUrl = $this->firebaseService->uploadFile(
+                    $request->file('screenshot'),
+                    'bugs/screenshots'
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to upload screenshot', [
+                    'error' => $e->getMessage()
+                ]);
+                return response()->json([
+                    'message' => 'Failed to upload screenshot',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
 
         // Map the data to our model's structure
         $mappedData = [
@@ -51,7 +84,7 @@ class BugController extends Controller
             'priority' => $data['priority'] ?? null,
             'assignee_id' => $data['assignee_id'] ?? null,
             'url' => $data['url'] ?? null,
-            'screenshot' => $data['screenshot'] ?? null,
+            'screenshot' => $screenshotUrl,
             'device' => $environment['device'] ?? null,
             'browser' => $environment['browser'] ?? null,
             'os' => $environment['os'] ?? null,
@@ -85,7 +118,7 @@ class BugController extends Controller
             'priority' => 'nullable|string',
             'assignee_id' => 'nullable|exists:users,id',
             'url' => 'nullable|string',
-            'screenshot' => 'nullable|string',
+            'screenshot' => 'nullable|file|image|max:10240', // 10MB max
             'qa_list_item_id' => 'nullable|exists:qa_checklist_items,id',
             'team_id' => 'nullable|exists:teams,id',
             'reported_by' => 'nullable|exists:users,id'
@@ -111,7 +144,8 @@ class BugController extends Controller
      */
     public function show(Bug $bug)
     {
-        return response()->json($bug->load('assignee'));
+        $this->authorize('view', $bug);
+        return response()->json($bug->load(['assignee', 'team']));
     }
 
     /**
@@ -127,6 +161,32 @@ class BugController extends Controller
      */
     public function update(Request $request, Bug $bug)
     {
+        $this->authorize('update', $bug);
+
+        // Handle file upload if present
+        $screenshotUrl = $bug->screenshot;
+        if ($request->hasFile('screenshot')) {
+            try {
+                // Delete old screenshot if exists
+                if ($bug->screenshot) {
+                    $this->firebaseService->deleteFile($bug->screenshot);
+                }
+
+                $screenshotUrl = $this->firebaseService->uploadFile(
+                    $request->file('screenshot'),
+                    'bugs/screenshots'
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to upload screenshot', [
+                    'error' => $e->getMessage()
+                ]);
+                return response()->json([
+                    'message' => 'Failed to upload screenshot',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
         $validated = $request->validate([
             'title' => 'nullable|string',
             'description' => 'nullable|string',
@@ -138,13 +198,15 @@ class BugController extends Controller
             'os' => 'nullable|string',
             'status' => 'nullable|string',
             'priority' => 'nullable|string',
-            'assignee_id' => 'nullable|exists:profiles,id',
+            'assignee_id' => 'nullable|exists:users,id',
             'url' => 'nullable|string',
-            'screenshot' => 'nullable|string'
+            'screenshot' => 'nullable|file|image|max:10240', // 10MB max
+            'team_id' => 'nullable|exists:teams,id'
         ]);
 
+        $validated['screenshot'] = $screenshotUrl;
         $bug->update($validated);
-        return response()->json($bug->load('assignee'));
+        return response()->json($bug->load(['assignee', 'team']));
     }
 
     /**
@@ -152,6 +214,19 @@ class BugController extends Controller
      */
     public function destroy(Bug $bug)
     {
+        $this->authorize('delete', $bug);
+
+        // Delete screenshot from Firebase if exists
+        if ($bug->screenshot) {
+            try {
+                $this->firebaseService->deleteFile($bug->screenshot);
+            } catch (\Exception $e) {
+                Log::error('Failed to delete screenshot', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         $bug->delete();
         return response()->json(null, 204);
     }
@@ -161,6 +236,9 @@ class BugController extends Controller
      */
     public function fixBug(Request $request, $bugId)
     {
+        $bug = Bug::findOrFail($bugId);
+        $this->authorize('update', $bug);
+
         Log::info('Fix bug request received', [
             'bug_id' => $bugId,
             'request' => $request->all()
@@ -175,19 +253,18 @@ class BugController extends Controller
             'data.attributes.solution' => 'required|string',
         ]);
 
-        $bug = Bug::findOrFail($bugId);
         $bug->status = $data['status'];
         $bug->save();
         Log::info('Bug status updated', ['bug_id' => $bugId, 'status' => $bug->status]);
 
         $fix = $bug->fixes()->create([
             'findings' => $data['findings'],
-            'solutions' => $data['solution'], // Note: changed from solutions to solution to match request
+            'solutions' => $data['solution'],
         ]);
         Log::info('Bug fix saved', ['bug_fix_id' => $fix->id, 'bug_id' => $bugId]);
 
         return response()->json([
-            'bug' => $bug,
+            'bug' => $bug->load(['assignee', 'team']),
             'fix' => $fix
         ]);
     }
