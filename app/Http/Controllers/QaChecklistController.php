@@ -10,6 +10,7 @@ use App\Models\QaChecklistAssignment;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class QaChecklistController extends Controller
 {
@@ -44,6 +45,17 @@ class QaChecklistController extends Controller
     {
         Log::debug('Storing new QA checklist', $request->all());
 
+        // Convert pending status to accepted in the request data
+        $requestData = $request->all();
+        if (isset($requestData['data']['attributes']['assignments'])) {
+            foreach ($requestData['data']['attributes']['assignments'] as &$assignment) {
+                if ($assignment['status'] === 'pending') {
+                    $assignment['status'] = 'accepted';
+                }
+            }
+        }
+        $request->merge($requestData);
+
         $validator = Validator::make($request->all(), [
             'data.type' => 'required|in:qa_checklists',
             'data.attributes.title' => 'required|string|max:255',
@@ -70,63 +82,77 @@ class QaChecklistController extends Controller
         }
 
         try {
-            $data = $request->input('data.attributes');
+            return DB::transaction(function () use ($request) {
+                $data = $request->input('data.attributes');
 
-            // Find or create category if provided
-            $categoryId = null;
-            if (!empty($data['category'])) {
-                $category = \App\Models\QaChecklistCategory::firstOrCreate(
-                    ['name' => $data['category']],
-                    [
-                        'slug' => \Illuminate\Support\Str::slug($data['category']),
-                        'is_active' => true,
-                        'created_by' => auth()->id(),
-                        'updated_by' => auth()->id(),
-                    ]
-                );
-                $categoryId = $category->id;
-            }
+                // Find or create category if provided
+                $categoryId = null;
+                if (!empty($data['category'])) {
+                    $category = \App\Models\QaChecklistCategory::firstOrCreate(
+                        ['name' => $data['category']],
+                        [
+                            'slug' => \Illuminate\Support\Str::slug($data['category']),
+                            'is_active' => true,
+                            'created_by' => auth()->id(),
+                            'updated_by' => auth()->id(),
+                        ]
+                    );
+                    $categoryId = $category->id;
+                }
 
-            // Create the checklist
-            $checklist = QaChecklist::create([
-                'title' => $data['title'],
-                'description' => $data['description'],
-                'status' => $data['status'],
-                'priority' => $data['priority'],
-                'tags' => $data['tags'] ?? [],
-                'category_id' => $categoryId,
-                'created_by' => auth()->id(),
-                'updated_by' => auth()->id(),
-            ]);
-
-            Log::info('Checklist created', ['id' => $checklist->id]);
-
-            // Create checklist items
-            foreach ($data['items'] as $item) {
-                $checklist->items()->create([
-                    'item_text' => $item['text'],
-                    'item_type' => $item['type'],
-                    'is_required' => $item['is_required'],
-                    'order_number' => $item['order_number'],
-                    'status' => $item['status'],
+                // Create the checklist
+                $checklist = QaChecklist::create([
+                    'title' => $data['title'],
+                    'description' => $data['description'],
+                    'status' => $data['status'],
+                    'priority' => $data['priority'],
+                    'tags' => $data['tags'] ?? [],
+                    'category_id' => $categoryId,
+                    'created_by' => auth()->id(),
+                    'updated_by' => auth()->id(),
                 ]);
-                Log::info('Checklist item created', $item);
-            }
 
-            // Create assignments
-            foreach ($data['assignments'] as $assignment) {
-                $checklist->assignments()->create([
-                    'user_id' => $assignment['user_id'],
-                    'status' => 'accepted', // Default to accepted since pending is not allowed
-                    'due_date' => $assignment['due_date'],
-                    'notes' => $assignment['notes'] ?? null,
-                    'assigned_by' => auth()->id(),
-                    'assigned_at' => now(),
-                ]);
-                Log::info('Assignment created', $assignment);
-            }
+                Log::info('Checklist created', ['id' => $checklist->id]);
 
-            return response()->json($checklist->load(['items', 'assignments.user', 'assignedUsers']), 201);
+                // Create checklist items
+                foreach ($data['items'] as $item) {
+                    $checklist->items()->create([
+                        'item_text' => $item['text'],
+                        'item_type' => $item['type'],
+                        'is_required' => $item['is_required'],
+                        'order_number' => $item['order_number'],
+                        'status' => $item['status'],
+                    ]);
+                    Log::info('Checklist item created', $item);
+                }
+
+                // Delete any existing assignments for this checklist
+                $checklist->assignments()->delete();
+
+                // Create assignments
+                $assignments = collect($data['assignments'])->map(function ($assignment) use ($checklist) {
+                    return [
+                        'user_id' => $assignment['user_id'],
+                        'status' => $assignment['status'],
+                        'due_date' => $assignment['due_date'],
+                        'notes' => $assignment['notes'] ?? null,
+                        'assigned_by' => auth()->id(),
+                        'assigned_at' => now(),
+                        'qa_checklist_id' => $checklist->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })->toArray();
+
+                // Bulk insert assignments
+                DB::table('qa_checklist_assignments')->insert($assignments);
+
+                foreach ($data['assignments'] as $assignment) {
+                    Log::info('Assignment created', $assignment);
+                }
+
+                return response()->json($checklist->load(['items', 'assignments.user', 'assignedUsers']), 201);
+            });
         } catch (\Exception $e) {
             Log::error('Failed to create checklist', [
                 'error' => $e->getMessage(),
