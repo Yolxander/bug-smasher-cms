@@ -15,7 +15,7 @@ class AsanaTicket extends Model
     protected $fillable = [
         'ticket_number',
         'bug_id',
-        'qa_checklist_item_id',
+        'qa_checklist_id',
         'status',
         'notes',
         'ticket_type',
@@ -24,7 +24,7 @@ class AsanaTicket extends Model
 
     protected $casts = [
         'bug_id' => 'integer',
-        'qa_checklist_item_id' => 'integer',
+        'qa_checklist_id' => 'integer',
     ];
 
     /**
@@ -36,11 +36,11 @@ class AsanaTicket extends Model
     }
 
     /**
-     * Get the QA checklist item associated with this ticket.
+     * Get the QA checklist associated with this ticket.
      */
-    public function qaChecklistItem(): BelongsTo
+    public function qaChecklist(): BelongsTo
     {
-        return $this->belongsTo(QaChecklistItem::class);
+        return $this->belongsTo(QaChecklist::class);
     }
 
     /**
@@ -85,8 +85,8 @@ class AsanaTicket extends Model
                                            "Expected Behavior: {$ticket->bug->expected_behavior}\n\n" .
                                            "Actual Behavior: {$ticket->bug->actual_behavior}\n\n" .
                                            "Additional Notes: {$ticket->notes}";
-                    } elseif ($ticket->ticket_type === 'qa_checklist' && $ticket->qaChecklistItem) {
-                        $checklist = $ticket->qaChecklistItem->checklist;
+                    } elseif ($ticket->ticket_type === 'qa_checklist' && $ticket->qaChecklist) {
+                        $checklist = $ticket->qaChecklist->checklist;
                         $taskData['title'] = "[QA] {$checklist->title} - {$ticket->ticket_number}";
                         $taskData['notes'] = "QA Checklist: {$checklist->title}\n\n" .
                                            "Description: {$checklist->description}\n\n" .

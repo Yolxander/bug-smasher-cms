@@ -31,6 +31,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::apiResource('profiles', ProfileController::class);
+    Route::get('/users', [ProfileController::class, 'index']);
 
     // Bugs
     Route::apiResource('bugs', BugController::class);

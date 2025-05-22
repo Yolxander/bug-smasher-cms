@@ -45,8 +45,8 @@ class AsanaTicketResource extends Resource
                             ->preload()
                             ->visible(fn (Get $get): bool => $get('ticket_type') === 'bug')
                             ->required(fn (Get $get): bool => $get('ticket_type') === 'bug'),
-                        Select::make('qa_checklist_item_id')
-                            ->relationship('qaChecklistItem.checklist', 'title')
+                        Select::make('qa_checklist_id')
+                            ->relationship('qaChecklist', 'title')
                             ->searchable()
                             ->preload()
                             ->visible(fn (Get $get): bool => $get('ticket_type') === 'qa_checklist')

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('ticket_number')->nullable()->unique();
             $table->foreignId('bug_id')->nullable()->constrained('bugs')->nullOnDelete();
-            $table->foreignId('qa_checklist_item_id')->nullable()->constrained('qa_checklist_items')->nullOnDelete();
+            $table->foreignId('qa_checklist_id')->nullable()->constrained('qa_checklists')->nullOnDelete();
             $table->string('status')->default('open');
             $table->text('notes')->nullable();
             $table->timestamps();

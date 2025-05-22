@@ -18,9 +18,9 @@ class CreateAsanaTicket extends CreateRecord
         // Generate ticket number in format ASANA-YYYY-XXXX
         $data['ticket_number'] = 'ASANA-' . date('Y') . '-' . str_pad(AsanaTicket::max('id') + 1, 4, '0', STR_PAD_LEFT);
 
-        // Ensure we have either bug_id or qa_checklist_item_id based on ticket_type
+        // Ensure we have either bug_id or qa_checklist_id based on ticket_type
         if ($data['ticket_type'] === 'bug') {
-            $data['qa_checklist_item_id'] = null;
+            $data['qa_checklist_id'] = null;
         } else {
             $data['bug_id'] = null;
         }
@@ -47,8 +47,7 @@ class CreateAsanaTicket extends CreateRecord
                         "**Additional Notes:**\n{$bug->additional_notes}"
                 ];
             } elseif ($record->ticket_type === 'qa_checklist') {
-                $checklistItem = $record->qaChecklistItem;
-                $checklist = $checklistItem->checklist;
+                $checklist = $record->qaChecklist;
                 $taskData = [
                     'title' => "[QA] {$checklist->title} - {$record->ticket_number}",
                     'notes' => "**Checklist Title:** {$checklist->title}\n\n" .
@@ -62,7 +61,7 @@ class CreateAsanaTicket extends CreateRecord
 
             // If it's a QA checklist ticket, create subtasks for all items
             if ($record->ticket_type === 'qa_checklist') {
-                $checklist = $record->qaChecklistItem->checklist;
+                $checklist = $record->qaChecklist;
                 foreach ($checklist->items as $item) {
                     try {
                         // Create subtask

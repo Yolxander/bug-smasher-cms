@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Profile;
 use Illuminate\Support\Facades\Log;
+use App\Models\User;
 
 class ProfileController extends Controller
 {
@@ -13,8 +14,24 @@ class ProfileController extends Controller
      */
     public function index()
     {
-        $profiles = Profile::all();
-        return response()->json($profiles);
+        $users = User::with('profile')->get();
+        return response()->json([
+            'data' => $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'profile' => $user->profile ? [
+                        'id' => $user->profile->id,
+                        'full_name' => $user->profile->full_name,
+                        'role' => $user->profile->role,
+                        'avatar_url' => $user->profile->avatar_url,
+                        'bio' => $user->profile->bio,
+                        'onboarding_completed' => $user->profile->onboarding_completed,
+                    ] : null
+                ];
+            })
+        ]);
     }
 
     /**
