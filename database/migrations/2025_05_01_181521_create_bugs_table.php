@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('status')->default('Open');
             $table->string('priority')->default('Medium');
             $table->foreignId('assignee_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->jsonb('project')->default('{"id": "1", "name": "Clever Project"}');
+            $table->json('project');
             $table->string('url')->nullable();
             $table->string('screenshot')->nullable();
             $table->timestamps();
