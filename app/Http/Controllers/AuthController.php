@@ -13,157 +13,63 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        Log::info('Registration attempt', [
-            'email' => $request->email,
-            'name' => $request->name,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
-        try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8|confirmed',
-            ]);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
 
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ]);
+        // Create a profile for the new user
+        $user->profile()->create([
+            'email' => $request->email,
+            'full_name' => $request->name,
+        ]);
 
-            Log::info('User created successfully', [
-                'user_id' => $user->id,
-                'email' => $user->email
-            ]);
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-            // Create a profile for the new user
-            $user->profile()->create([
-                'email' => $request->email,
-                'full_name' => $request->name,
-            ]);
-
-            Log::info('User profile created', [
-                'user_id' => $user->id,
-                'profile_id' => $user->profile->id
-            ]);
-
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            Log::info('Registration completed successfully', [
-                'user_id' => $user->id,
-                'token_created' => true
-            ]);
-
-            return response()->json([
-                'user' => $user->load('profile'),
-                'token' => $token,
-            ], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Registration validation failed', [
-                'errors' => $e->errors(),
-                'request_data' => $request->except(['password', 'password_confirmation'])
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Registration failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->except(['password', 'password_confirmation'])
-            ]);
-            throw $e;
-        }
+        return response()->json([
+            'user' => $user->load('profile'),
+            'token' => $token,
+        ], 201);
     }
 
     public function login(Request $request)
     {
-        Log::info('Login attempt', [
-            'email' => $request->email,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
 
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
+        if (!Auth::attempt($request->only('email', 'password'))) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
             ]);
-
-            Log::info('Login validation passed', [
-                'email' => $request->email
-            ]);
-
-            if (!Auth::attempt($request->only('email', 'password'))) {
-                Log::warning('Login failed - Invalid credentials', [
-                    'email' => $request->email,
-                    'ip' => $request->ip()
-                ]);
-                throw ValidationException::withMessages([
-                    'email' => ['The provided credentials are incorrect.'],
-                ]);
-            }
-
-            $user = User::where('email', $request->email)
-                ->with('profile')
-                ->firstOrFail();
-
-            Log::info('User authenticated successfully', [
-                'user_id' => $user->id,
-                'email' => $user->email
-            ]);
-
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            Log::info('Login completed successfully', [
-                'user_id' => $user->id,
-                'token_created' => true
-            ]);
-
-            return response()->json([
-                'user' => $user,
-                'token' => $token,
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Login validation failed', [
-                'errors' => $e->errors(),
-                'request_data' => $request->except(['password'])
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Login failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->except(['password'])
-            ]);
-            throw $e;
         }
+
+        $user = User::where('email', $request->email)
+            ->with('profile')
+            ->firstOrFail();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+        ]);
     }
 
     public function logout(Request $request)
     {
-        Log::info('Logout attempt', [
-            'user_id' => $request->user()->id,
-            'ip' => $request->ip()
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Successfully logged out'
         ]);
-
-        try {
-            $request->user()->currentAccessToken()->delete();
-
-            Log::info('Logout successful', [
-                'user_id' => $request->user()->id
-            ]);
-
-            return response()->json([
-                'message' => 'Successfully logged out'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Logout failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()->id
-            ]);
-            throw $e;
-        }
     }
 }
