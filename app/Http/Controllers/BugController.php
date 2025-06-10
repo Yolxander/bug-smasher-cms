@@ -40,15 +40,45 @@ class BugController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('Creating new bug', [
+            'user_id' => auth()->id(),
+            'request_data' => $request->except(['screenshot']),
+            'has_screenshot' => $request->has('screenshot')
+        ]);
+
         try {
             $validated = $request->validate([
                 'title' => 'required|string|max:255',
                 'description' => 'required|string',
-                'severity' => 'required|in:low,medium,high,critical',
-                'status' => 'required|in:open,in_progress,resolved,closed',
+                'priority' => ['required', 'string', function ($attribute, $value, $fail) {
+                    $validPriorities = ['Low', 'Medium', 'High'];
+                    if (!in_array($value, $validPriorities)) {
+                        $fail('The selected priority is invalid.');
+                    }
+                }],
+                'status' => ['required', 'string', function ($attribute, $value, $fail) {
+                    $validStatuses = ['New', 'Open', 'In Progress', 'Resolved', 'Closed'];
+                    if (!in_array($value, $validStatuses)) {
+                        $fail('The selected status is invalid.');
+                    }
+                }],
                 'assignee_id' => 'nullable|exists:users,id',
                 'team_id' => 'nullable|exists:teams,id',
+//                'project_id' => 'nullable|exists:projects,id',
+                'url' => 'nullable|string',
+                'device' => 'nullable|string',
+                'browser' => 'nullable|string',
+                'os' => 'nullable|string',
+                'steps_to_reproduce' => 'nullable|string',
+                'expected_behavior' => 'nullable|string',
+                'actual_behavior' => 'nullable|string',
+                'reported_by' => 'nullable|exists:users,id',
                 'screenshot' => 'nullable|string|max:255',
+                'relatedItem' => 'nullable|string',
+            ]);
+
+            Log::info('Bug validation passed', [
+                'validated_data' => array_keys($validated)
             ]);
 
             // Handle screenshot upload
@@ -71,7 +101,16 @@ class BugController extends Controller
                         // Handle file upload
                         $screenshotUrl = $this->uploadScreenshotToFirebase($request->file('screenshot'));
                     }
+
+                    Log::info('Screenshot uploaded successfully', [
+                        'url' => $screenshotUrl,
+                        'filename' => $filename ?? null
+                    ]);
                 } catch (\Exception $e) {
+                    Log::error('Failed to upload screenshot', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
                     return response()->json([
                         'message' => 'Failed to upload screenshot',
                         'error' => $e->getMessage()
@@ -79,28 +118,75 @@ class BugController extends Controller
                 }
             }
 
+            // Find QA checklist item if relatedItem is provided
+            $qaListItemId = null;
+            if ($request->has('relatedItem')) {
+                $qaListItem = QaChecklistItem::where('identifier', $request->relatedItem)->first();
+                if ($qaListItem) {
+                    $qaListItemId = $qaListItem->id;
+                    Log::info('QA checklist item found', [
+                        'identifier' => $request->relatedItem,
+                        'qa_list_item_id' => $qaListItemId
+                    ]);
+                } else {
+                    Log::warning('QA checklist item not found', [
+                        'identifier' => $request->relatedItem
+                    ]);
+                }
+            }
+
             // Map the data to our model's structure
             $mappedData = [
                 'title' => $validated['title'],
                 'description' => $validated['description'],
-                'severity' => $validated['severity'],
+                'priority' => $validated['priority'],
                 'status' => $validated['status'],
                 'assignee_id' => $validated['assignee_id'] ?? null,
                 'team_id' => $validated['team_id'] ?? null,
+//                'project_id' => $validated['project_id'] ?? null,
+                'url' => $validated['url'] ?? null,
+                'device' => $validated['device'] ?? null,
+                'browser' => $validated['browser'] ?? null,
+                'os' => $validated['os'] ?? null,
+                'steps_to_reproduce' => $validated['steps_to_reproduce'] ?? null,
+                'expected_behavior' => $validated['expected_behavior'] ?? null,
+                'actual_behavior' => $validated['actual_behavior'] ?? null,
                 'screenshot_url' => $screenshotUrl ?? null,
+                'reported_by' => $validated['reported_by'] ?? auth()->id(),
                 'created_by' => auth()->id(),
+                'qa_list_item_id' => $qaListItemId,
             ];
 
+            Log::info('Creating bug with mapped data', [
+                'mapped_data' => array_keys($mappedData)
+            ]);
+
             $bug = Bug::create($mappedData);
+
+            Log::info('Bug created successfully', [
+                'bug_id' => $bug->id,
+                'title' => $bug->title,
+                'status' => $bug->status,
+                'qa_list_item_id' => $qaListItemId
+            ]);
 
             return response()->json($bug->load(['assignee', 'team']), 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Bug validation failed', [
+                'errors' => $e->errors(),
+                'request_data' => $request->except(['screenshot'])
+            ]);
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
+            Log::error('Failed to create bug', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['screenshot'])
+            ]);
             return response()->json([
                 'message' => 'Failed to create bug',
                 'error' => $e->getMessage()
