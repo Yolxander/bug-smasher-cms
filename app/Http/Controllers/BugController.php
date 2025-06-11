@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Storage;
 
 class BugController extends Controller
 {
@@ -73,7 +74,7 @@ class BugController extends Controller
                 'expected_behavior' => 'nullable|string',
                 'actual_behavior' => 'nullable|string',
                 'reported_by' => 'nullable|exists:users,id',
-                'screenshot' => 'nullable|string|max:255',
+                'screenshot' => 'nullable|file|image|max:5120',
                 'relatedItem' => 'nullable|string',
             ]);
 
@@ -82,32 +83,24 @@ class BugController extends Controller
             ]);
 
             // Handle screenshot upload
-            if ($request->has('screenshot')) {
+            if ($request->hasFile('screenshot')) {
                 try {
-                    if (is_string($request->screenshot) && Str::startsWith($request->screenshot, 'data:image')) {
-                        // Handle base64 image
-                        $imageData = explode(',', $request->screenshot);
-                        $decodedImage = base64_decode($imageData[1]);
-                        $extension = explode('/', explode(';', $imageData[0])[0])[1];
-                        $filename = 'screenshot_' . time() . '.' . $extension;
+                    $file = $request->file('screenshot');
+                    $filename = 'screenshot_' . time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+                    $s3Path = '2025/yolxi/' . $filename;
 
-                        // Save to storage
-                        $path = storage_path('app/public/screenshots/' . $filename);
-                        file_put_contents($path, $decodedImage);
+                    // Upload to S3
+                    Storage::disk('s3')->putFileAs('2025/yolxi', $file, $filename);
 
-                        // Get public URL
-                        $screenshotUrl = asset('storage/screenshots/' . $filename);
-                    } elseif ($request->hasFile('screenshot')) {
-                        // Handle file upload
-                        $screenshotUrl = $this->uploadScreenshotToFirebase($request->file('screenshot'));
-                    }
+                    // Get the S3 URL
+                    $screenshotUrl = Storage::disk('s3')->url($s3Path);
 
-                    Log::info('Screenshot uploaded successfully', [
+                    Log::info('Screenshot uploaded successfully to S3', [
                         'url' => $screenshotUrl,
-                        'filename' => $filename ?? null
+                        'filename' => $filename
                     ]);
                 } catch (\Exception $e) {
-                    Log::error('Failed to upload screenshot', [
+                    Log::error('Failed to upload screenshot to S3', [
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
                     ]);
