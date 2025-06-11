@@ -29,7 +29,7 @@ class Bug extends Model
         'browser',
         'os',
         'url',
-        'screenshot',
+        'screenshot_url',
         'qa_list_item_id',
         'team_id'
     ];
