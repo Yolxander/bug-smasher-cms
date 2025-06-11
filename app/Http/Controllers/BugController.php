@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Storage;
+use Aws\S3\S3Client;
+use Aws\Exception\AwsException;
 
 class BugController extends Controller
 {
@@ -89,20 +91,82 @@ class BugController extends Controller
                     $filename = 'screenshot_' . time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
                     $s3Path = '2025/yolxi/' . $filename;
 
-                    // Upload to S3
-                    Storage::disk('s3')->putFileAs('2025/yolxi', $file, $filename);
+                    Log::info('Attempting to upload file to S3', [
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getMimeType(),
+                        'size' => $file->getSize(),
+                        's3_path' => $s3Path,
+                        'bucket' => config('filesystems.disks.s3.bucket'),
+                        'region' => config('filesystems.disks.s3.region'),
+                        'aws_key' => config('filesystems.disks.s3.key') ? 'set' : 'not set',
+                        'aws_secret' => config('filesystems.disks.s3.secret') ? 'set' : 'not set'
+                    ]);
+
+                    // Create S3 client
+                    $s3Client = new S3Client([
+                        'version' => 'latest',
+                        'region'  => config('filesystems.disks.s3.region'),
+                        'credentials' => [
+                            'key'    => config('filesystems.disks.s3.key'),
+                            'secret' => config('filesystems.disks.s3.secret'),
+                        ],
+                    ]);
+
+                    // Upload file
+                    $result = $s3Client->putObject([
+                        'Bucket' => config('filesystems.disks.s3.bucket'),
+                        'Key'    => $s3Path,
+                        'Body'   => fopen($file->getRealPath(), 'rb'),
+                        'ContentType' => $file->getMimeType(),
+                    ]);
 
                     // Get the S3 URL
-                    $screenshotUrl = Storage::disk('s3')->url($s3Path);
+                    $screenshotUrl = $result['ObjectURL'];
 
                     Log::info('Screenshot uploaded successfully to S3', [
                         'url' => $screenshotUrl,
-                        'filename' => $filename
+                        'filename' => $filename,
+                        's3_path' => $s3Path,
+                        'result' => $result
                     ]);
+                } catch (AwsException $e) {
+                    Log::error('AWS S3 Exception', [
+                        'error' => $e->getMessage(),
+                        'code' => $e->getAwsErrorCode(),
+                        'request_id' => $e->getAwsRequestId(),
+                        'type' => $e->getAwsErrorType(),
+                        'trace' => $e->getTraceAsString(),
+                        'file_info' => [
+                            'original_name' => $file->getClientOriginalName(),
+                            'mime_type' => $file->getMimeType(),
+                            'size' => $file->getSize()
+                        ],
+                        'aws_config' => [
+                            'bucket' => config('filesystems.disks.s3.bucket'),
+                            'region' => config('filesystems.disks.s3.region'),
+                            'key_set' => config('filesystems.disks.s3.key') ? 'yes' : 'no',
+                            'secret_set' => config('filesystems.disks.s3.secret') ? 'yes' : 'no'
+                        ]
+                    ]);
+                    return response()->json([
+                        'message' => 'Failed to upload screenshot to S3',
+                        'error' => $e->getMessage()
+                    ], 500);
                 } catch (\Exception $e) {
                     Log::error('Failed to upload screenshot to S3', [
                         'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'trace' => $e->getTraceAsString(),
+                        'file_info' => [
+                            'original_name' => $file->getClientOriginalName(),
+                            'mime_type' => $file->getMimeType(),
+                            'size' => $file->getSize()
+                        ],
+                        'aws_config' => [
+                            'bucket' => config('filesystems.disks.s3.bucket'),
+                            'region' => config('filesystems.disks.s3.region'),
+                            'key_set' => config('filesystems.disks.s3.key') ? 'yes' : 'no',
+                            'secret_set' => config('filesystems.disks.s3.secret') ? 'yes' : 'no'
+                        ]
                     ]);
                     return response()->json([
                         'message' => 'Failed to upload screenshot',
