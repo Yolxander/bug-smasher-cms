@@ -233,7 +233,7 @@ class BugController extends Controller
             if (strtolower($bug->priority) === 'high') {
                 try {
                     $asanaService = new AsanaService();
-                    $ticketNumber = 'ASANA-' . date('Y') . '-' . str_pad(AsanaTicket::max('id') + 1, 4, '0', STR_PAD_LEFT);
+                    $ticketNumber = 'BUG_SMASHER-' . date('Y') . '-' . str_pad(AsanaTicket::max('id') + 1, 4, '0', STR_PAD_LEFT);
                     $notes = "### Description\n{$bug->description}\n\n" .
                         "### Steps to Reproduce\n{$bug->steps_to_reproduce}\n\n" .
                         "### Expected Behavior\n{$bug->expected_behavior}\n\n" .
