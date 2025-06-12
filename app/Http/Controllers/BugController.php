@@ -13,6 +13,8 @@ use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Storage;
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
+use App\Services\AsanaService;
+use App\Models\AsanaTicket;
 
 class BugController extends Controller
 {
@@ -226,6 +228,45 @@ class BugController extends Controller
                 'status' => $bug->status,
                 'qa_list_item_id' => $qaListItemId
             ]);
+
+            // If the bug priority is High, create an Asana ticket
+            if (strtolower($bug->priority) === 'high') {
+                try {
+                    $asanaService = new AsanaService();
+                    $ticketNumber = 'ASANA-' . date('Y') . '-' . str_pad(AsanaTicket::max('id') + 1, 4, '0', STR_PAD_LEFT);
+                    $taskData = [
+                        'title' => "[Bug] {$bug->title} - {$ticketNumber}",
+                        'notes' => "**Description:**\n{$bug->description}\n\n" .
+                            "**Steps to Reproduce:**\n{$bug->steps_to_reproduce}\n\n" .
+                            "**Expected Behavior:**\n{$bug->expected_behavior}\n\n" .
+                            "**Actual Behavior:**\n{$bug->actual_behavior}\n\n" .
+                            "**Additional Notes:**\n{$bug->additional_notes}"
+                    ];
+                    $asanaResponse = $asanaService->createTask($taskData);
+                    $asanaTaskId = $asanaResponse['data']['gid'] ?? null;
+
+                    // Create AsanaTicket record
+                    $asanaTicket = AsanaTicket::create([
+                        'ticket_number' => $ticketNumber,
+                        'bug_id' => $bug->id,
+                        'ticket_type' => 'bug',
+                        'asana_task_id' => $asanaTaskId,
+                        'status' => 'open',
+                        'notes' => $bug->description,
+                    ]);
+
+                    Log::info('Asana ticket created for high priority bug', [
+                        'bug_id' => $bug->id,
+                        'asana_ticket_id' => $asanaTicket->id,
+                        'asana_task_id' => $asanaTaskId
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to create Asana ticket for high priority bug', [
+                        'bug_id' => $bug->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             return response()->json($bug->load(['assignee', 'team']), 201);
 

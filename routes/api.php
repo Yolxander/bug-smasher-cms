@@ -55,4 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('teams/{team}/members/{member}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember']);
     Route::put('teams/{team}/members/{member}/role', [\App\Http\Controllers\Api\TeamController::class, 'updateMemberRole']);
     Route::get('teams/member/{memberId}', [\App\Http\Controllers\Api\TeamController::class, 'getTeamsByMemberId']);
+
+    // Asana Tickets
+    Route::post('asana-tickets', [\App\Http\Controllers\Api\AsanaTicketController::class, 'store']);
 });
