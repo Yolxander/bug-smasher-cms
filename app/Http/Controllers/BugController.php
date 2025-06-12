@@ -234,13 +234,17 @@ class BugController extends Controller
                 try {
                     $asanaService = new AsanaService();
                     $ticketNumber = 'ASANA-' . date('Y') . '-' . str_pad(AsanaTicket::max('id') + 1, 4, '0', STR_PAD_LEFT);
+                    $notes = "### Description\n{$bug->description}\n\n" .
+                        "### Steps to Reproduce\n{$bug->steps_to_reproduce}\n\n" .
+                        "### Expected Behavior\n{$bug->expected_behavior}\n\n" .
+                        "### Actual Behavior\n{$bug->actual_behavior}\n\n" .
+                        "### Additional Notes\n{$bug->additional_notes}\n\n";
+                    if (!empty($bug->screenshot_url)) {
+                        $notes .= "### Screenshot\n[View Screenshot]({$bug->screenshot_url})\n\n";
+                    }
                     $taskData = [
                         'title' => "[Bug] {$bug->title} - {$ticketNumber}",
-                        'notes' => "**Description:**\n{$bug->description}\n\n" .
-                            "**Steps to Reproduce:**\n{$bug->steps_to_reproduce}\n\n" .
-                            "**Expected Behavior:**\n{$bug->expected_behavior}\n\n" .
-                            "**Actual Behavior:**\n{$bug->actual_behavior}\n\n" .
-                            "**Additional Notes:**\n{$bug->additional_notes}"
+                        'notes' => $notes
                     ];
                     $asanaResponse = $asanaService->createTask($taskData);
                     $asanaTaskId = $asanaResponse['data']['gid'] ?? null;
